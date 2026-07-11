@@ -1,0 +1,102 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────
+# Shared volume — all services that produce or serve media use this
+# ─────────────────────────────────────────────────────────────────
+volumes:
+  media_storage:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/server/codevisualizer/media
+      o: bind
+
+
+services:
+
+  # ───────────────────────────────────────────────
+  # Nginx — receives traffic from Cloudflare Tunnel
+  # ───────────────────────────────────────────────
+  nginx:
+    build: ./nginx
+    container_name: cv_nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+    volumes:
+      - media_storage:/app/media
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ───────────────────────────────────────────────
+  # React frontend — served as static files via Nginx inside the container
+  # ───────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: cv_frontend
+    restart: unless-stopped
+
+  # ───────────────────────────────────────────────
+  # FastAPI backend — handles API requests
+  # ───────────────────────────────────────────────
+  backend:
+    build: ./backend
+    container_name: cv_backend
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+    env_file: .env
+    depends_on:
+      - redis
+    volumes:
+      - media_storage:/app/media
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # Security: no privilege escalation, drop all Linux capabilities
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # ───────────────────────────────────────────────
+  # Celery worker — picks up rendering jobs from Redis
+  # ───────────────────────────────────────────────
+  celery_worker:
+    build: ./backend
+    container_name: cv_celery
+    command: celery -A celery_worker worker --loglevel=info --concurrency=2 --max-tasks-per-child=10
+    env_file: .env
+    depends_on:
+      - redis
+    volumes:
+      - media_storage:/app/media
+    restart: unless-stopped
+    # Manim needs temp space — give it a decent /tmp
+    tmpfs:
+      - /tmp:size=512m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # ───────────────────────────────────────────────
+  # Redis — message broker and result backend for Celery
+  # ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cv_redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
