@@ -2,6 +2,7 @@ FROM python:3.11-slim
 
 # System dependencies needed by Manim and TTS
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     ffmpeg \
     libcairo2-dev \
     libpango1.0-dev \
