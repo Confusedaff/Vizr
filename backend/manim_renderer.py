@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import glob
 from manim import *
 from typing import List, Dict, Any
 
@@ -125,15 +126,14 @@ def render_scene(steps: List[Dict], job_id: str):
         scene = AlgorithmScene(steps, job_id)
         scene.render()
 
-        # Find the output MP4 and move it to the shared media folder
-        output_path = os.path.join(
-            tmpdir, "videos", "AlgorithmScene", "720p30", "AlgorithmScene.mp4"
-        )
-
-        if not os.path.exists(output_path):
+        # Manim's output subfolder name isn't guaranteed — search for it
+        # instead of assuming an exact path.
+        candidates = glob.glob(os.path.join(tmpdir, "videos", "**", "*.mp4"), recursive=True)
+        if not candidates:
             raise FileNotFoundError(
-                f"Manim did not produce an output file at: {output_path}"
+                f"Manim did not produce any .mp4 output under: {os.path.join(tmpdir, 'videos')}"
             )
+        output_path = candidates[0]
 
         destination = os.path.join(MEDIA_PATH, f"{job_id}.mp4")
         shutil.move(output_path, destination)
