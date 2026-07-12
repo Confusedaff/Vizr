@@ -1,59 +1,68 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 
-def build_narration_script(steps: List[Dict[str, Any]], code: str = "") -> str:
+def build_narration_lines(steps: List[Dict[str, Any]], code: str = "") -> List[Tuple[int, str]]:
     """
-    Convert the list of execution trace steps into a natural-language
-    narration script for the TTS engine.
+    Convert the list of execution trace steps into narration lines, each
+    tagged with the index of the step it describes.
+
+    Returns a list of (step_index, text) tuples rather than one joined
+    string. step_index refers to the position in `steps` -- the same
+    index the Manim renderer iterates over -- so the renderer can attach
+    each narration clip's audio to the exact animation beat for that
+    step via Scene.add_sound(), instead of narrating on a separate,
+    unsynchronized timeline.
+
+    step_index of -1 is the intro line (played at the very start) and
+    -2 is the outro line (played at the very end). These are two
+    distinct sentinels, not one value reused for both, because the
+    renderer builds a dict keyed by step_index -- reusing one value
+    for both would make the outro silently overwrite the intro's
+    entry in that dict.
+
+    Kept intentionally terse: only narrate steps where something
+    meaningfully changed, matching when the renderer's array/variable
+    animations actually update, rather than describing every traced
+    line regardless of whether anything visually changed.
     """
-    lines = [
-        "Welcome to the algorithm visualization.",
-        "Let's walk through this code step by step.",
-        f"The algorithm has {len(steps)} execution steps in total.",
-    ]
+    result: List[Tuple[int, str]] = [(-1, "Let's walk through this algorithm.")]
 
     prev_vars = {}
 
     for i, step in enumerate(steps):
-        line_num = step.get("line")
         variables = step.get("variables", {})
         event = step.get("event", "line")
         output = step.get("output")
         error = step.get("error")
 
         if error:
-            lines.append(f"The execution encountered an error: {error}")
+            result.append((i, f"The execution hit an error: {error}"))
             break
 
         if event == "return":
             return_val = step.get("return_value")
-            lines.append(f"Step {i + 1}. The function returns the value {return_val}.")
+            result.append((i, f"The function returns {return_val}."))
             continue
 
-        step_desc = f"Step {i + 1}. We are now on line {line_num}."
-
-        # Describe variable changes since the last step
         changed = []
         for key, val in variables.items():
             if key not in prev_vars or prev_vars[key] != val:
                 changed.append((key, val))
 
         if changed:
-            for key, val in changed[:3]:    # Describe at most 3 changes per step
-                if isinstance(val, list):
-                    step_desc += f" The list {key} now has {len(val)} elements."
-                elif isinstance(val, dict):
-                    step_desc += f" The dictionary {key} now has {len(val)} entries."
-                elif isinstance(val, int):
-                    step_desc += f" {key} is now {val}."
-                else:
-                    step_desc += f" {key} changed."
+            key, val = changed[0]
+            if isinstance(val, list):
+                text = f"Now tracking a list of {len(val)} items."
+            elif isinstance(val, int):
+                text = f"{key} becomes {val}."
+            else:
+                text = f"{key} updates."
+            result.append((i, text))
 
-        lines.append(step_desc)
         prev_vars = dict(variables)
 
         if output:
-            lines.append(f"The program printed: {output}")
+            result.append((i, f"Output: {output}"))
 
-    lines.append("The visualization is now complete.")
-    return " ".join(lines)
+    result.append((-2, "That's the full walkthrough."))
+    return result

@@ -72,7 +72,7 @@ services:
   celery_worker:
     build: ./backend
     container_name: cv_celery
-    command: celery -A celery_worker worker --loglevel=info --concurrency=2 --max-tasks-per-child=10
+    command: celery -A celery_worker worker --loglevel=info --concurrency=2 --max-tasks-per-child=1
     env_file: .env
     depends_on:
       - redis

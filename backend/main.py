@@ -84,7 +84,9 @@ def get_job_status(job_id: str):
     """
     Poll this endpoint after submitting code.
     Returns: status (queued | processing | complete | error),
-             video_url and audio_url when complete.
+             video_url when complete. The video already contains
+             narration audio embedded in it — there is no separate
+             audio file anymore.
     """
     result = AsyncResult(job_id, app=celery_app)
 
@@ -92,7 +94,6 @@ def get_job_status(job_id: str):
         return {
             "status": "complete",
             "video_url": f"/media/{job_id}.mp4",
-            "audio_url": f"/media/{job_id}.mp3",
         }
 
     if result.state == "FAILURE":
