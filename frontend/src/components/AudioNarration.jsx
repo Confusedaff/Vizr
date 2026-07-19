@@ -18,7 +18,7 @@ function AudioNarration({ audioUrl, currentTime }) {
   return (
     <div className="audio-container">
       <label className="audio-label">
-        🔊 Audio Narration
+        Narration track
       </label>
       <audio
         ref={audioRef}

@@ -8,8 +8,8 @@ import { submitCode, getJobStatus } from './api/client';
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 60;     // 60 × 3s = 3 minutes max wait
 
-function App() {
-  const [code, setCode] = useState('');
+function App({ initialCode = '' }) {
+  const [code, setCode] = useState(initialCode);
   const [language, setLanguage] = useState('python');
   const [status, setStatus] = useState('idle');
   const [videoUrl, setVideoUrl] = useState(null);
@@ -86,7 +86,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>Code Visualizer</h1>
-        <p>Paste an algorithm, watch it animate step by step</p>
+        <p>Paste an algorithm, get a narrated walkthrough</p>
       </header>
 
       <main className="app-main">

@@ -6,7 +6,7 @@ function VideoPlayer({ videoUrl, onTimeUpdate }) {
   if (!videoUrl) {
     return (
       <div className="player-placeholder">
-        <p>Visualization will appear here after rendering</p>
+        <p>Paste code on the left and press Visualize to generate a narrated walkthrough</p>
       </div>
     );
   }
@@ -23,7 +23,7 @@ function VideoPlayer({ videoUrl, onTimeUpdate }) {
             onTimeUpdate(videoRef.current.currentTime);
           }
         }}
-        style={{ borderRadius: '8px', background: '#000' }}
+        style={{ display: 'block' }}
       >
         Your browser does not support the video tag.
       </video>

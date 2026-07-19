@@ -49,6 +49,26 @@ def trace_code(code: str) -> List[Dict[str, Any]]:
     captured_output = []
     local_vars: Dict[str, Any] = {}
 
+    # Determine up front (via AST, before any execution) whether this code
+    # defines any functions at all. This must be known BEFORE tracing
+    # starts, not inferred dynamically during the trace: the module frame
+    # emits 'line' events for statements like `result = two_sum(...)` at
+    # the point the call is *about* to happen, while `two_sum` already
+    # exists as a module-level local — before any function frame has been
+    # entered. A dynamic "have we seen a function frame yet" flag would
+    # still be False at that moment, letting that event slip through with
+    # the function object itself sitting in its variable snapshot.
+    try:
+        import ast
+        has_function_defs = any(
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            for node in ast.walk(ast.parse(code))
+        )
+    except SyntaxError:
+        # If the code doesn't even parse, let exec() raise and report the
+        # syntax error below as before; tracing behavior here doesn't matter.
+        has_function_defs = False
+
     def tracer(frame, event, arg):
         if len(steps) >= MAX_STEPS:
             return None
@@ -58,6 +78,20 @@ def trace_code(code: str) -> List[Dict[str, Any]]:
 
         # Only trace the top-level executed code, not library internals
         if frame.f_code.co_filename != "<string>":
+            return tracer
+
+        # Skip the module-level frame entirely whenever the submitted code
+        # defines at least one function — the module frame's f_locals are
+        # top-level globals (function objects from `def`, module-scope
+        # assignments like `result = ...`), not the algorithm's actual
+        # working state, and a function object isn't deepcopy-able so
+        # _safe_copy() falls back to repr(), producing values like
+        # "<function two_sum at 0x7fa...>" in the Variables panel.
+        #
+        # Code with no function definitions at all (plain top-level
+        # statements, no `def` anywhere) has no other frame to trace, so
+        # in that case the module frame is kept and this never skips.
+        if frame.f_code.co_name == "<module>" and has_function_defs:
             return tracer
 
         snapshot = {}
