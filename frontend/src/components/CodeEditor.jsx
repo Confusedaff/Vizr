@@ -61,7 +61,7 @@ function CodeEditor({ code, setCode, language }) {
         <span className="editor-lang">{language}</span>
       </div>
       <Editor
-        height="400px"
+        height="100%"
         language={language}
         value={code}
         onChange={(value) => setCode(value || '')}

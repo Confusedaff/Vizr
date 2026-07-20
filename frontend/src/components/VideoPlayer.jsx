@@ -23,7 +23,7 @@ function VideoPlayer({ videoUrl, onTimeUpdate }) {
   }
 
   return (
-    <div>
+    <div className="player-loaded">
       <div className="video-container">
         <video
           ref={videoRef}
