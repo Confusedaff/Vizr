@@ -87,6 +87,15 @@ def build_narration_lines(steps: List[Dict[str, Any]], code: str = "") -> List[T
             result.append((i, f"The execution hit an error: {error}"))
             break
 
+        if event == "truncated":
+            # tracer.py stops recording (and stops tracing entirely) once
+            # MAX_STEPS is hit, so there is no real return value to
+            # narrate here -- just an honest note that this is a partial
+            # trace, rather than letting the video end abruptly with no
+            # explanation.
+            result.append((i, "This run is longer than we can fully visualize — here's as far as we got."))
+            break
+
         if event == "return":
             return_val = step.get("return_value")
             result.append((i, f"The function returns {_speakable(return_val)}."))

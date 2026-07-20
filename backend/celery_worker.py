@@ -33,7 +33,7 @@ celery_app.conf.update(
 
 
 @celery_app.task(bind=True, name="render_visualization")
-def render_visualization(self, code: str, language: str, job_id: str):
+def render_visualization(self, code: str, language: str, job_id: str, quality: str = "standard"):
     """
     Main Celery task. Orchestrates:
     1. Code tracing
@@ -47,6 +47,9 @@ def render_visualization(self, code: str, language: str, job_id: str):
     and hold each frame long enough for that clip to finish playing.
     There is no longer a separate audio file or audio_url; the single
     output .mp4 contains both video and audio.
+
+    quality: "standard" (720p30, default) or "high" (1080p60, slower).
+    See manim_renderer.QUALITY_MAP.
     """
     from tracer import trace_code
     from manim_renderer import render_scene
@@ -88,6 +91,6 @@ def render_visualization(self, code: str, language: str, job_id: str):
         # This must happen while clip_dir still exists (hence being
         # inside the `with` block) since Scene.add_sound() reads the
         # clip files directly during scene.render().
-        render_scene(steps, job_id, narration_by_step=narration_by_step)
+        render_scene(steps, job_id, code=code, narration_by_step=narration_by_step, quality=quality)
 
     return {"job_id": job_id, "step_count": len(steps)}

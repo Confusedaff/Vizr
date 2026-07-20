@@ -138,9 +138,11 @@ body {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
-.lang-select {
+.lang-select,
+.quality-select {
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text-primary);
@@ -153,11 +155,13 @@ body {
   transition: border-color 0.15s ease;
 }
 
-.lang-select:hover {
+.lang-select:hover,
+.quality-select:hover {
   border-color: var(--text-tertiary);
 }
 
 .lang-select:focus-visible,
+.quality-select:focus-visible,
 .visualize-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -276,10 +280,36 @@ body {
   50% { opacity: 0.55; box-shadow: 0 0 0 4px transparent; }
 }
 
+.status-cancel-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.status-cancel-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.status-cancel-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ---------------------------------------------
-   Right panel: unified player chrome
-   Video + narration presented as one instrument
-   rather than two stacked, unrelated boxes.
+   Right panel: player chrome
+   Narration is embedded directly in the video file
+   now (Scene.add_sound() at render time) rather than
+   a separate audio track, so there's just the one box.
 --------------------------------------------- */
 .player-placeholder {
   background: var(--surface);
@@ -306,53 +336,48 @@ body {
 }
 
 .video-container {
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border);
-  border-bottom: none;
   background: #000;
   line-height: 0;
 }
 
-.audio-container {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-top: 1px solid var(--border-soft);
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  padding: 14px 16px 16px;
+.playback-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px 0;
 }
 
-/* When both video and audio are present, remove the
-   double-border seam so they read as one player. */
-.video-container + .audio-container {
-  margin-top: -1px;
-}
-
-.audio-label {
+.playback-speed-label {
   font-size: 11px;
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
-.audio-label::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
+.playback-speed-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
 }
 
-audio {
-  accent-color: var(--accent);
+.playback-speed-select:hover {
+  border-color: var(--text-tertiary);
 }
 
-audio::-webkit-media-controls-panel {
-  background: var(--surface-raised);
+.playback-speed-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 768px) {

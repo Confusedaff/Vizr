@@ -42,8 +42,21 @@ def trace_code(code: str) -> List[Dict[str, Any]]:
     Each step dict contains:
       - line (int): the line number about to be executed
       - variables (dict): snapshot of all local variables at this point
-      - event (str): 'line', 'call', or 'return'
+      - event (str): 'line', 'call', 'return', 'error', or 'truncated'
       - output (str): any print() output from this step
+
+    NOTE ON MAX_STEPS: once the cap is hit, a single synthetic
+    {"event": "truncated"} step is appended and tracing is switched off
+    for the remainder of execution (see the tracer() closure below).
+    Returning None from a trace function only stops *tracing* -- the
+    code keeps running to completion untraced, including whatever
+    'return' event would otherwise have been captured. Without the
+    truncated marker, a long-running loop would previously just stop
+    accumulating steps with no signal to the caller that anything was
+    cut short, and no narrated return value, since that final 'return'
+    event silently never reaches the tracer. Downstream (narration_builder.py,
+    manim_renderer.py) can look for this event to tell the person the
+    trace was cut off, instead of the video just quietly ending.
     """
     steps: List[Dict[str, Any]] = []
     captured_output = []
@@ -71,6 +84,16 @@ def trace_code(code: str) -> List[Dict[str, Any]]:
 
     def tracer(frame, event, arg):
         if len(steps) >= MAX_STEPS:
+            # Only append the marker once, right on the transition into
+            # "we've hit the cap" -- every subsequent tracer call (for
+            # this frame or any new one) would otherwise re-enter this
+            # branch and keep appending duplicates.
+            if not steps or steps[-1].get("event") != "truncated":
+                steps.append({
+                    "line": None,
+                    "variables": {},
+                    "event": "truncated",
+                })
             return None
 
         if event not in ("line", "return"):

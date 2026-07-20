@@ -27,7 +27,15 @@ const applyEditorTheme = (monaco) => {
   });
 };
 
-const DEFAULT_CODE = `def two_sum(nums, target):
+// Exported so App.jsx can use this as the real initial editor content.
+// Previously this was only ever passed as Monaco's `defaultValue`, but
+// App.jsx always supplies a defined `value` prop (even as an empty
+// string) -- and once `value` is defined, Monaco treats the editor as
+// controlled and `defaultValue` is never consulted at all. That made
+// this demo unreachable in practice: anyone opening the editor directly
+// (rather than through a chip that sets real starter code) just saw a
+// blank box instead of this example.
+export const DEFAULT_CODE = `def two_sum(nums, target):
     seen = {}
     for i, num in enumerate(nums):
         complement = target - num
@@ -59,7 +67,6 @@ function CodeEditor({ code, setCode, language }) {
         onChange={(value) => setCode(value || '')}
         theme="code-visualizer-dark"
         beforeMount={handleBeforeMount}
-        defaultValue={DEFAULT_CODE}
         options={{
           fontSize: 14,
           fontFamily: "'JetBrains Mono', 'Fira Code', monospace",

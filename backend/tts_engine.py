@@ -9,6 +9,37 @@ logger = logging.getLogger(__name__)
 
 _tts_instance = None
 
+# LJSpeech Tacotron2-DDC is the default — fast, clear, and known to fit
+# comfortably inside the Celery task's time budget (see celery_worker.py's
+# task_soft_time_limit=300 / task_time_limit=360). It's also a single,
+# fairly dated, fairly monotone voice, and generating one WAV per line
+# (see generate_narration_clips below) means no cross-sentence prosody,
+# so it will sound choppier than continuous narration from a stronger
+# model.
+#
+# ON UPGRADING THIS: Coqui AI (the company behind this project) shut down
+# in January 2024. The `TTS` package on PyPI is frozen at its final
+# release (0.22.0) and requires Python >=3.9,<3.12 — that's *why*
+# Dockerfile.backend is pinned to python:3.11-slim specifically, not just
+# a convenient default. Don't bump that base image without checking
+# whether whatever TTS-related package is in use at the time still
+# supports it.
+#
+# XTTS v2 (multilingual, voice-cloning capable, noticeably more natural)
+# shipped in the original TTS package before the shutdown, so it may
+# already be available via this same frozen release just by changing
+# TTS_MODEL_NAME below to an XTTS v2 model string — no package swap
+# needed. Two things to check before doing that, though, neither of
+# which has been validated here: (1) XTTS v2's model weights are
+# licensed CPML (nc-only) — confirm that's compatible with your use of
+# this app before shipping it; (2) it's a substantially heavier model
+# per-clip than Tacotron2-DDC, so load-test actual clip generation time
+# against the existing task_soft_time_limit/task_time_limit above before
+# changing the default — a model that's simply too slow will start
+# failing jobs outright rather than just sounding better.
+DEFAULT_MODEL_NAME = "tts_models/en/ljspeech/tacotron2-DDC"
+TTS_MODEL_NAME = os.getenv("TTS_MODEL_NAME", DEFAULT_MODEL_NAME)
+
 
 def _load_tts_model():
     """
@@ -19,10 +50,9 @@ def _load_tts_model():
     global _tts_instance
     if _tts_instance is None:
         from TTS.api import TTS
-        logger.info("Loading TTS model for the first time...")
-        # LJSpeech Tacotron2 — fast, clear, natural-sounding English voice
+        logger.info(f"Loading TTS model '{TTS_MODEL_NAME}' for the first time...")
         _tts_instance = TTS(
-            model_name="tts_models/en/ljspeech/tacotron2-DDC",
+            model_name=TTS_MODEL_NAME,
             progress_bar=False
         )
         logger.info("TTS model loaded.")

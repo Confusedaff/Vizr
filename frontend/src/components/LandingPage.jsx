@@ -1,10 +1,5 @@
 import React, { useState } from 'react';
-
-const EXAMPLES = [
-  'Explain binary search',
-  'Show bubble sort',
-  'Visualize BFS on a graph',
-];
+import { EXAMPLES } from '../exampleCode';
 
 function LandingPage({ onLaunch }) {
   const [prompt, setPrompt] = useState('');
@@ -44,8 +39,8 @@ function LandingPage({ onLaunch }) {
             type="text"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Try: Explain binary search"
-            aria-label="Describe or paste the code you want visualized"
+            placeholder="Paste your own code, or try one of the examples below"
+            aria-label="Paste the code you want visualized"
           />
           <button type="submit" aria-label="Start visualizing">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -56,8 +51,8 @@ function LandingPage({ onLaunch }) {
 
         <div className="landing-chips">
           {EXAMPLES.map((ex) => (
-            <button key={ex} className="landing-chip" onClick={() => onLaunch(ex)}>
-              {ex}
+            <button key={ex.label} className="landing-chip" onClick={() => onLaunch(ex.label)}>
+              {ex.label}
             </button>
           ))}
         </div>
@@ -74,9 +69,9 @@ function LandingPage({ onLaunch }) {
             rewatch, share, or scrub through, not just a static diagram.
           </p>
           <ul className="landing-feature-list">
-            <li>Python and JavaScript, with syntax highlighting as you type</li>
-            <li>Narrated 1080p-quality walkthroughs, generated per submission</li>
-            <li>Scrub the video and the narration track stays in sync</li>
+            <li>Python, with syntax highlighting as you type</li>
+            <li>Narrated walkthroughs with the actual code on screen, generated per submission</li>
+            <li>Scrub the video and the narration stays in sync — it's baked into the same file</li>
           </ul>
         </div>
 
