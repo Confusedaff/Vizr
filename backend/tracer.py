@@ -154,7 +154,25 @@ def trace_code(code: str) -> List[Dict[str, Any]]:
 
     try:
         compiled = compile(code, "<string>", "exec")
-        exec(compiled, {}, local_vars)
+        # NOTE: a single dict, used for both globals and locals, is
+        # deliberate and load-bearing -- not a simplification. Passing
+        # two SEPARATE dicts here (e.g. exec(compiled, {}, local_vars))
+        # is a classic exec() gotcha: top-level code then behaves as if
+        # it's running inside a function body, so `def factorial(n): ...`
+        # binds the name `factorial` into the locals dict, while the
+        # function object's own __globals__ points at the (different,
+        # empty) globals dict. The first top-level call to factorial(5)
+        # still works, but the moment factorial calls ITSELF from inside
+        # its own body, that lookup goes through __globals__ and finds
+        # nothing there -- a NameError on the exact name that's clearly
+        # defined right above it. This breaks any submission with
+        # recursion, or with one top-level function calling another.
+        # Using one shared dict for both matches how a real module
+        # actually executes (a module's __dict__ serves as both its
+        # globals and where top-level names land), which is why this
+        # only ever shows up under exec() with mismatched dicts and
+        # never when just running the same code as a normal script.
+        exec(compiled, local_vars)
     except ExecutionTimeoutError:
         error = f"Execution timed out after {EXECUTION_TIMEOUT_SECONDS} seconds"
     except SyntaxError as e:
