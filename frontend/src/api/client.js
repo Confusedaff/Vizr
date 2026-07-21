@@ -19,6 +19,19 @@ export const submitCode = async (code, language = 'python', quality = 'standard'
 // step (only meaningful while processing: "tracing" | "narrating" | "rendering" | null),
 // video_url (only once complete -- narration is embedded directly in this
 // video, there is no separate audio_url), message (only on error).
+//
+// While processing, may also include:
+//   elapsed_seconds     — wall-clock time since the job actually started
+//                          (server-anchored, not client-clock-based, so
+//                          a missed poll or a slow one doesn't skew it)
+//   step_count / steps_done — only present once rendering has begun;
+//                          tracing must finish first since step_count
+//                          comes from the real trace
+//   estimated_seconds / eta_sample_count — a predicted total duration
+//                          from the backend's render_stats history.
+//                          Absent when there isn't yet enough history
+//                          for this quality/step-count combination --
+//                          absence means "no countdown yet," not zero.
 export const getJobStatus = async (jobId) => {
   const response = await axios.get(`${BASE_URL}/job/${jobId}`);
   return response.data;

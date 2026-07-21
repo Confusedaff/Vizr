@@ -5,7 +5,7 @@ import shutil
 import tempfile
 import glob
 from manim import *
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 
 MEDIA_PATH = os.getenv("MEDIA_PATH", "/app/media")
 
@@ -111,6 +111,7 @@ class AlgorithmScene(Scene):
         job_id: str,
         code: str = "",
         narration_by_step: Optional[Dict[int, tuple]] = None,
+        on_progress: Optional[Callable[[int, int], None]] = None,
         **kwargs,
     ):
         """
@@ -118,11 +119,25 @@ class AlgorithmScene(Scene):
         Index -1 is reserved for intro/outro narration, played at the very
         start/end of the scene rather than tied to a specific step.
         Pass None (or omit) to render with no audio at all.
+
+        on_progress: optional callback(steps_done, step_count) invoked
+        once per animated step from inside construct()'s loop, so the
+        caller (celery_worker.py) can surface live rendering progress
+        via Celery's update_state() rather than the job showing one
+        static "rendering" status for however long the render call
+        takes as a single opaque unit. Rendering is by far the longest
+        of the task's three phases, so this is the phase where a
+        person actually needs feedback that something is still
+        happening. Never raises even if the callback itself throws --
+        see the try/except around its call site in construct() -- a
+        broken progress callback should never be able to fail an
+        otherwise-successful render.
         """
         self.steps = steps
         self.job_id = job_id
         self.code = code
         self.narration_by_step = narration_by_step or {}
+        self.on_progress = on_progress
         super().__init__(**kwargs)
 
     def _play_narration_if_any(self, step_index: int) -> float:
@@ -285,6 +300,18 @@ class AlgorithmScene(Scene):
             narration_duration = self._play_narration_if_any(i)
             self.wait(max(MIN_STEP_HOLD, narration_duration))
 
+            if self.on_progress is not None:
+                try:
+                    self.on_progress(i + 1, len(self.steps))
+                except Exception:
+                    # A progress callback is a courtesy to the caller,
+                    # not part of what makes this render correct. If it
+                    # throws (e.g. the Celery task's Redis connection
+                    # blipped mid-render), the render itself must keep
+                    # going rather than losing an otherwise-successful
+                    # job over a status update.
+                    pass
+
         if current_array_mob is not None:
             self.play(FadeOut(current_array_mob), run_time=0.2)
 
@@ -394,6 +421,7 @@ def render_scene(
     code: str = "",
     narration_by_step: Optional[Dict[int, tuple]] = None,
     quality: str = "standard",
+    on_progress: Optional[Callable[[int, int], None]] = None,
 ):
     """
     Entry point called by the Celery worker.
@@ -407,6 +435,8 @@ def render_scene(
     Falls back to "standard" for any unrecognized value rather than
     raising, since a render job failing outright over a bad quality
     string would be a worse failure mode than silently using the default.
+
+    on_progress: forwarded to AlgorithmScene — see its docstring.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         config.media_dir = tmpdir
@@ -415,7 +445,10 @@ def render_scene(
         config.disable_caching = True
         config.background_color = BG
 
-        scene = AlgorithmScene(steps, job_id, code=code, narration_by_step=narration_by_step)
+        scene = AlgorithmScene(
+            steps, job_id, code=code, narration_by_step=narration_by_step,
+            on_progress=on_progress,
+        )
         scene.render()
 
         candidates = glob.glob(os.path.join(tmpdir, "videos", "**", "*.mp4"), recursive=True)

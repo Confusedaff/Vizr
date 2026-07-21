@@ -1,10 +1,12 @@
 import os
+import time
 import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, validator
 from celery.result import AsyncResult
 from celery_worker import celery_app, render_visualization
+import render_stats
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -106,6 +108,32 @@ def get_job_status(job_id: str):
              video_url when complete. The video already contains
              narration audio embedded in it — there is no separate
              audio file anymore.
+
+    While processing, also returns (when available):
+      elapsed_seconds  — wall-clock time since the task actually started
+                          (anchored to celery_worker.py's task_start_wall,
+                          not to whenever this particular poll happened to
+                          land, so a slow poll or a missed one doesn't
+                          distort the number)
+      step_count / steps_done — only present once rendering has begun
+                          (tracing must finish first, since step_count
+                          comes from the real trace, not a guess). Not
+                          present while a job is still truly PENDING
+                          (queued, not yet picked up by any worker) —
+                          there's no task meta in the backend at all
+                          until the worker's first update_state call,
+                          so there's nothing yet to read quality or a
+                          step count from.
+      estimated_seconds / eta_sample_count — a predicted total duration
+                          for this job, from render_stats.py's rolling
+                          average of past jobs at the same quality and
+                          step-count bucket. Only present once step_count
+                          is known AND that bucket has at least
+                          render_stats.MIN_SAMPLES_FOR_ESTIMATE completed
+                          samples; otherwise omitted entirely, which the
+                          frontend treats as "don't show a countdown yet"
+                          rather than showing an estimate built from too
+                          little history.
     """
     result = AsyncResult(job_id, app=celery_app)
 
@@ -127,8 +155,42 @@ def get_job_status(job_id: str):
     # show something more specific than one static "processing" message for
     # however long the render takes.
     if result.state in ("PENDING", "STARTED", "RETRY"):
-        step = (result.info or {}).get("step") if isinstance(result.info, dict) else None
-        return {"status": "processing", "step": step}
+        info = result.info if isinstance(result.info, dict) else {}
+        step = info.get("step")
+
+        response = {"status": "processing", "step": step}
+
+        task_start = info.get("task_start")
+        if task_start is not None:
+            response["elapsed_seconds"] = max(0.0, time.time() - task_start)
+
+        step_count = info.get("step_count")
+        steps_done = info.get("steps_done")
+        if step_count is not None:
+            response["step_count"] = step_count
+            response["steps_done"] = steps_done if steps_done is not None else 0
+
+            # quality comes from `info` -- populated in every
+            # update_state meta dict celery_worker.py sends, starting
+            # from its very first call at task start -- rather than
+            # from result.args. AsyncResult.args reads from the same
+            # backend-stored task meta that update_state itself writes
+            # (confirmed via Celery's own source: `.args` is just
+            # `_get_task_meta().get('args')`), which is empty until the
+            # worker has actually picked up the task and made its first
+            # update_state call. Since step_count is also only ever set
+            # starting at that same first "rendering"-phase call, by
+            # the time step_count is present, quality is guaranteed to
+            # be present in the same dict -- so there's no window where
+            # this reads a stale or missing quality for a bucket lookup.
+            quality = info.get("quality", "standard")
+
+            estimate = render_stats.estimate_render_time(quality, step_count)
+            if estimate is not None:
+                response["estimated_seconds"] = estimate["estimated_seconds"]
+                response["eta_sample_count"] = estimate["sample_count"]
+
+        return response
 
     return {"status": "processing", "step": None}
 
